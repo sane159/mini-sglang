@@ -19,6 +19,7 @@ from .cache import CacheManager
 from .config import SchedulerConfig
 from .decode import DecodeManager
 from .io import SchedulerIOMixin
+from .policy import SchedulePolicy
 from .prefill import ChunkedReq, PrefillManager
 from .table import TableManager
 
@@ -70,6 +71,12 @@ class Scheduler(SchedulerIOMixin):
         self.eos_token_id = self.tokenizer.eos_token_id
         self.token_pool = self.table_manager.token_pool
         self.prefill_budget = config.max_extend_tokens
+        self.schedule_policy = SchedulePolicy(
+            policy=config.schedule_policy,
+            prefill_budget=self.prefill_budget,
+            max_consecutive_decode=config.max_consecutive_decode,
+            balanced_prefill_budget=config.balanced_prefill_budget,
+        )
         # self.config = config
 
         # Initialize the I/O mixin
@@ -217,10 +224,8 @@ class Scheduler(SchedulerIOMixin):
         )
 
     def _schedule_next_batch(self) -> ForwardInput | None:
-        # TODO: support other policies: e.g. DECODE first
-        batch = (
-            self.prefill_manager.schedule_next_batch(self.prefill_budget)
-            or self.decode_manager.schedule_next_batch()
+        batch = self.schedule_policy.select_next_batch(
+            self.prefill_manager, self.decode_manager
         )
         return self._prepare_batch(batch) if batch else None
 

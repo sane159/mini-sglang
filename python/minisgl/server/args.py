@@ -64,6 +64,7 @@ def parse_args(args: List[str], run_shell: bool = False) -> Tuple[ServerArgs, bo
     from minisgl.attention import validate_attn_backend
     from minisgl.kvcache import SUPPORTED_CACHE_MANAGER
     from minisgl.moe import SUPPORTED_MOE_BACKENDS
+    from minisgl.scheduler.policy import SUPPORTED_SCHEDULE_POLICIES
 
     parser = argparse.ArgumentParser(description="MiniSGL Server Arguments")
 
@@ -215,6 +216,28 @@ def parse_args(args: List[str], run_shell: bool = False) -> Tuple[ServerArgs, bo
         default=ServerArgs.moe_backend,
         choices=["auto"] + SUPPORTED_MOE_BACKENDS.supported_names(),
         help="The MoE backend to use.",
+    )
+
+    parser.add_argument(
+        "--schedule-policy",
+        type=str,
+        default=ServerArgs.schedule_policy,
+        choices=SUPPORTED_SCHEDULE_POLICIES,
+        help="The scheduling policy: prefill_first, decode_first, or balanced.",
+    )
+
+    parser.add_argument(
+        "--max-consecutive-decode",
+        type=int,
+        default=ServerArgs.max_consecutive_decode,
+        help="Max consecutive decode steps before giving queued prefill a chance (balanced policy).",
+    )
+
+    parser.add_argument(
+        "--balanced-prefill-budget",
+        type=int,
+        default=ServerArgs.balanced_prefill_budget,
+        help="Max prefill token budget per step under balanced policy (defaults to max_extend_tokens).",
     )
 
     parser.add_argument(
