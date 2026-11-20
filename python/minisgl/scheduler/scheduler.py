@@ -76,6 +76,7 @@ class Scheduler(SchedulerIOMixin):
             prefill_budget=self.prefill_budget,
             max_consecutive_decode=config.max_consecutive_decode,
             balanced_prefill_budget=config.balanced_prefill_budget,
+            adaptive_budget=config.adaptive_budget,
         )
         # self.config = config
 

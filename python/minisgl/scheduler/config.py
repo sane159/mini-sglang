@@ -19,6 +19,7 @@ class SchedulerConfig(EngineConfig):
     schedule_policy: str = "prefill_first"
     max_consecutive_decode: int = 8
     balanced_prefill_budget: int | None = None
+    adaptive_budget: bool = False
 
     # networking config
     _unique_suffix: str = field(default_factory=_get_pid_suffix)

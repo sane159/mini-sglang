@@ -241,6 +241,13 @@ def parse_args(args: List[str], run_shell: bool = False) -> Tuple[ServerArgs, bo
     )
 
     parser.add_argument(
+        "--adaptive-budget",
+        action="store_true",
+        default=ServerArgs.adaptive_budget,
+        help="Scale up balanced prefill budget when prefill queue backlog grows.",
+    )
+
+    parser.add_argument(
         "--shell-mode",
         action="store_true",
         help="Run the server in shell mode.",

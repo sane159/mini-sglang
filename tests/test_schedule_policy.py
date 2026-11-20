@@ -93,3 +93,31 @@ class TestSchedulePolicy(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestAdaptiveBudget(unittest.TestCase):
+    def test_adaptive_budget_scales_with_backlog(self):
+        @dataclass
+        class QueuePrefillManager(FakePrefillManager):
+            pending_list: list = field(default_factory=list)
+
+        policy = SchedulePolicy(
+            "balanced",
+            prefill_budget=4096,
+            max_consecutive_decode=1,
+            balanced_prefill_budget=1024,
+            adaptive_budget=True,
+        )
+        dm = FakeDecodeManager()
+
+        # Short backlog (< 4): uses base budget 1024
+        pm_low = QueuePrefillManager(pending_list=[1, 2])
+        policy.select_next_batch(pm_low, dm)  # decode step 1
+        policy.select_next_batch(pm_low, dm)  # prefill step
+        self.assertEqual(pm_low.budgets_received, [1024])
+
+        # High backlog (>= 4): scales up to 2048
+        pm_high = QueuePrefillManager(pending_list=[1, 2, 3, 4, 5])
+        policy.select_next_batch(pm_high, dm)  # decode step 1
+        policy.select_next_batch(pm_high, dm)  # prefill step
+        self.assertEqual(pm_high.budgets_received, [2048])

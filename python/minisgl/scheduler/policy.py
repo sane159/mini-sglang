@@ -19,6 +19,7 @@ class SchedulePolicy:
     prefill_budget: int = 8192
     max_consecutive_decode: int = 8
     balanced_prefill_budget: int | None = None
+    adaptive_budget: bool = False
     consecutive_decode_steps: int = 0
 
     def __post_init__(self) -> None:
@@ -27,6 +28,8 @@ class SchedulePolicy:
                 f"Unsupported schedule policy: {self.policy!r}. "
                 f"Expected one of {SUPPORTED_SCHEDULE_POLICIES}."
             )
+        if self.prefill_budget <= 0:
+            raise ValueError(f"prefill_budget must be > 0, got {self.prefill_budget}")
         if self.max_consecutive_decode < 0:
             raise ValueError(
                 f"max_consecutive_decode must be >= 0, got {self.max_consecutive_decode}"
@@ -41,6 +44,19 @@ class SchedulePolicy:
         if self.balanced_prefill_budget is None:
             return self.prefill_budget
         return min(self.prefill_budget, self.balanced_prefill_budget)
+
+    def _next_balanced_prefill_budget(self, prefill_manager: PrefillManager) -> int:
+        base_budget = self.effective_balanced_budget
+        if not self.adaptive_budget:
+            return base_budget
+        # If prefill queue has multiple pending requests, scale up budget up to prefill_budget
+        # to drain queued TTFT backlog faster while keeping bounded bursts.
+        pending = getattr(prefill_manager, "pending_list", None)
+        pending_len = len(pending) if pending is not None else 0
+        if pending_len >= 4:
+            scaled = min(self.prefill_budget, max(base_budget, base_budget * 2))
+            return scaled
+        return base_budget
 
     def select_next_batch(
         self,
@@ -82,8 +98,9 @@ class SchedulePolicy:
                 self.consecutive_decode_steps += 1
                 return batch
 
-        # Reached consecutive decode limit: give queued prefill a chance with bounded budget
-        batch = prefill_manager.schedule_next_batch(self.effective_balanced_budget)
+        # Reached consecutive decode limit: give queued prefill a chance with bounded/adaptive budget
+        budget = self._next_balanced_prefill_budget(prefill_manager)
+        batch = prefill_manager.schedule_next_batch(budget)
         if batch is not None:
             self.consecutive_decode_steps = 0
             return batch
